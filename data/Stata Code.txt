@@ -1,0 +1,297 @@
+**drop uneligible
+drop if eligible == "no"
+drop if age > 0 & age < 18
+drop if age > 79
+**recode missing variables
+replace diagnosis = "." if diagnosis =="-9"
+replace dxcode = . if dxcode ==-9
+rename var10 cortisone_yn
+replace cortisone_yn = "." if cortisone_yn =="-9"
+replace nitropatch = "." if nitropatch =="-9"
+replace surgery = "." if surgery =="-9"
+replace coldlaser = "." if coldlaser =="-9"
+replace massage = "." if massage =="-9"
+replace acupuncture = "." if acupuncture =="-9"
+replace chiropractor = "." if chiropractor =="-9"
+replace age = . if age ==-9
+replace race = "." if race =="-9"
+replace athlete_status = "." if athlete_status =="-9"
+destring duration_m, generate(duration_months)
+replace duration_months = . if duration_months ==-9
+replace time0 = . if time0 ==-9
+replace time0 = . if time0 ==-9999
+replace time0 = . if time0 ==-2
+replace time6 = . if time6 ==-9
+replace time6 = . if time6 ==-9999
+replace time6 = . if time6 ==-2
+replace time12 = . if time12 ==-9
+replace time12 = . if time12 ==-9999
+replace time12 = . if time12 ==-2
+replace time26 = . if time26 ==-9
+replace time26 = . if time26 ==-9999
+replace time26 = . if time26 ==-2
+replace time52 = . if time52 ==-9
+replace time52 = . if time52 ==-9999
+replace time52 = . if time52 ==-2
+**-2 means not applicable or N/A
+
+**list first ten rows
+list patientid dxcode prptype failedcontrt age gender race outcome time0 time6 time12 time26 time52 in 1/10
+
+**Filter out eligibility criteria
+ drop if duration_months > 0 & duration_months < 1.5
+ drop if failedcontrt == "no"
+ 
+ ** Keep ABI in dataset, but when coding compare prptype if treatment == "PRP"
+ drop if prptype == "abi"
+ 
+ **rename outcomes-- not needed with reshape... only when left in long format
+ *gen outcome_num =.
+ *replace outcome_num=1 if outcome == "lpt"
+ *replace outcome_num=2 if outcome == "pda"
+ *replace outcome_num=3 if outcome == "pfar"
+ *replace outcome_num=4 if outcome == "pse"
+ *replace outcome_num=5 if outcome == "sear" 
+ *replace outcome_num=6 if inlist(outcome, "dash", "dashr", "dashl", "fadi", "fadil", "fadir","hip", "hipl") 
+ *replace outcome_num=6 if inlist(outcome, "hipr", "visaa", "visaal", "visaar", "visap", "visapl", "visapr")
+ 
+ **recode gener, prptype
+ gen gender_num =. 
+ replace gender_num = 0 if gender == "m"
+ replace gender_num = 1 if gender == "f"
+ 
+ *gen prptype_num =. 
+ *replace prptype_num = 2 if prptype == "abi"
+ *replace prptype_num = 1 if prptype == "biomet"
+ *replace prptype_num = 1 if prptype == "cascade"
+ 
+ gen prponly_num =. 
+ replace prponly_num = 1 if prptype == "biomet"
+ replace prponly_num = 2 if prptype == "cascade"
+ 
+
+**Reshape wide from long
+ ** doesn't work__reshape wide time0 time6 time12 time26 time52, i(patientid) j(outcome_num)
+ reshape wide time0 time6 time12 time26 time52, i(patientid) j(outcome) string
+ 
+ **lpt improved, same, worse...
+ gen lptbetter6 =.
+ replace lptbetter6 = 1 if (time6lpt >0) & (time6lpt < 3)
+ replace lptbetter6 = 2 if (time6lpt >= 3) & (time6lpt <= 4)
+ replace lptbetter6 = 3 if (time6lpt > 4) & (time6lpt <=6)
+ 
+ gen lptbetter12 =.
+ replace lptbetter12 = 1 if (time12lpt >0) & (time12lpt < 3)
+ replace lptbetter12 = 2 if (time12lpt >= 3) & (time12lpt <= 4)
+ replace lptbetter12 = 3 if (time12lpt > 4) & (time12lpt <=6)
+ 
+ gen lptbetter26 =.
+ replace lptbetter26 = 1 if (time26lpt >0) & (time26lpt < 3)
+ replace lptbetter26 = 2 if (time26lpt >= 3) & (time26lpt <= 4)
+ replace lptbetter26 = 3 if (time26lpt > 4) & (time26lpt <=6)
+ 
+ gen lptbetter52 =.
+ replace lptbetter52 = 1 if (time52lpt >0) & (time52lpt < 3)
+ replace lptbetter52 = 2 if (time52lpt >= 3) & (time52lpt <= 4)
+ replace lptbetter52 = 3 if (time52lpt > 4) & (time52lpt <=6)
+ 
+ ** Freqencies of improved v. not in PRPtype and Diagnosis
+ 
+tabulate  prptype lptbetter6, row
+tabulate  prptype lptbetter12, row
+tabulate  prptype lptbetter26, row
+tabulate  prptype lptbetter52, row
+
+tabulate  lptbetter6
+tabulate  lptbetter12
+tabulate  lptbetter26
+tabulate  lptbetter52
+
+tabulate  dxcode lptbetter6, row
+tabulate  dxcode lptbetter12, row
+tabulate  dxcode lptbetter26, row
+tabulate  dxcode lptbetter52, row
+
+by dxcode prptype, sort : tabulate lptbetter52
+ 
+ **make outcome score change variables
+ gen lpt12wch =.
+ replace lpt12wch = time12lpt-time6lpt
+ gen lpt26wch =.
+ replace lpt26wch = time26lpt-time6lpt
+ gen lpt52wch =.
+ replace lpt52wch = time52lpt-time6lpt 
+
+ gen pda6wch =.
+ replace pda6wch = time6pda-time0pda
+ gen pda12wch =.
+ replace pda12wch = time12pda-time0pda 
+ gen pda26wch =.
+ replace pda26wch = time26pda-time0pda
+ gen pda52wch =.
+ replace pda52wch = time52pda-time0pda
+ 
+ gen pse6wch =.
+ replace pse6wch = time6pse-time0pse
+ gen pse12wch =.
+ replace pse12wch = time12pse-time0pse
+ gen pse26wch =.
+ replace pse26wch = time26pse-time0pse
+ gen pse52wch =.
+ replace pse52wch = time52pse-time0pse
+ 
+ gen dash52wch =.
+ replace dash52wch = time52dash-time0dash
+ gen fadi52wch =.
+ replace fadi52wch = time52fadi-time0fadi
+ gen hip52wch =.
+ replace hip52wch = time52hip-time0hip
+ gen visaa52wch =.
+ replace visaa52wch = time52visaa-time0visaa
+ gen visap52wch =.
+ replace visap52wch = time52visap-time0visap
+ 
+ gen dash52wch2 =.
+ replace dash52wch2 = time0dash-time52dash
+ gen fadi52wch2 =.
+ replace fadi52wch2 = time0fadi-time52fadi
+ gen hip52wch2 =.
+ replace hip52wch2 = time0hip-time52hip
+ gen visaa52wch2 =.
+ replace visaa52wch2 = time0visaa-time52visaa
+ gen visap52wch2 =.
+ replace visap52wch2 = time0visap-time52visap
+ 
+**PDA and PSE scores for those who have 3 **ONLY** on lptbetter52 with and without ABI** See Below for stats by time point**
+tabstat time0pda time6pda time12pda time26pda time52pda time0pse time6pse time12pse time26pse time52pse if lptbetter52 == 3, statistics( mean sd min max count median ) columns(variables)
+by prptype, sort : tabstat time0pda time6pda time12pda time26pda time52pda if lptbetter52 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse time6pse time12pse time26pse time52pse if lptbetter52 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+tabstat time0pda time6pda time12pda time26pda time52pda if lptbetter52 == 3, statistics( mean sd median count min max ) columns(variables)
+tabstat time0pse time6pse time12pse time26pse time52pse if lptbetter52 == 3, statistics( mean sd median count min max ) columns(variables)
+ 
+**Counts of PRP with and without ABI
+tabstat prptype_num if prptype_num == 1, statistics( count ) by(prptype) columns(variables)
+tabstat prptype_num, statistics( count ) by(prptype) columns(variables)
+
+**LPT by diagnosis code and PRPtype
+ by dxcode, sort : tabstat time0lpt time6lpt time12lpt time26lpt time52lpt, statistics( mean sd median count min max ) by(dxcode) columns(variables)
+by prptype, sort : tabstat time0lpt time6lpt time12lpt time26lpt time52lpt, statistics( mean sd median count min max ) by(prptype) columns(variables)
+
+**Count # improved in LPT scores
+tabstat lptbetter6, statistics( count ) by(lptbetter6) columns(variables)
+tabstat lptbetter12, statistics( count ) by(lptbetter12) columns(variables)
+tabstat lptbetter26, statistics( count ) by(lptbetter26) columns(variables)
+tabstat lptbetter52, statistics( count ) by(lptbetter52) columns(variables)
+
+**MANOVA for Lpt Scors by dxcode and prptype
+manova time6lpt time12lpt time26lpt time52lpt = prponly_num
+manova time6lpt time12lpt time26lpt time52lpt = dxcode
+
+**MANOVA for pda Scors by dxcode and prptype
+manova time0pda time6pda time12pda time26pda time52pda = prponly_num
+manova time0pda time6pda time12pda time26lpt time52pda = dxcode
+
+**MANOVA for pse Scors by dxcode and prptype
+manova time0pse time6pse time12pse time26pse time52pse = prponly_num
+manova time0pse time6pse time12pse time26pse time52pse = dxcode
+
+**Score Change Pre-Post Sum stats and t-test
+tabstat lpt12wch lpt26wch lpt52wch if prptype != "abi", statistics( mean sd median count min max range ) columns(variables)
+tabstat lpt12wch lpt26wch lpt52wch if prptype != "abi", statistics( mean sd median count min max range ) by(prptype) columns(variables)
+tabstat lpt12wch lpt26wch lpt52wch if prptype != "abi", statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+
+tabstat pda6wch pda12wch pda26wch pda52wch if prptype != "abi", statistics( mean sd median count min max range ) columns(variables)
+tabstat pda6wch pda12wch pda26wch pda52wch if prptype != "abi", statistics( mean sd median count min max range ) by(prptype) columns(variables)
+tabstat pda6wch pda12wch pda26wch pda52wch if prptype != "abi", statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+
+tabstat pse6wch pse12wch pse26wch pse52wch if prptype != "abi", statistics( mean sd median count min max range ) columns(variables)
+tabstat pse6wch pse12wch pse26wch pse52wch if prptype != "abi", statistics( mean sd median count min max range ) by(prptype) columns(variables)
+tabstat pse6wch pse12wch pse26wch pse52wch if prptype != "abi", statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+
+tabstat dash52wch, statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+tabstat fadi52wch, statistics( mean sd median count min max range ) by(dxcode) columns(variables) 
+tabstat hip52wch, statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+tabstat visaa52wch, statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+tabstat visap52wch, statistics( mean sd median count min max range ) by(dxcode) columns(variables)
+
+tabstat fadi52wch, statistics( count mean sd ) by(diagnosis ) columns(variables)
+tabstat hip52wch, statistics( count mean sd ) by(diagnosis ) columns(variables)
+tabstat visaa52wch, statistics( count mean sd ) by(diagnosis ) columns(variables)
+tabstat visap52wch, statistics( count mean sd ) by(diagnosis ) columns(variables)
+tabstat dash52wch2, statistics( count mean sd ) by(diagnosis ) columns(variables)
+
+**PDA and PSE scores for those who have 3 on lptbetters
+tabstat time0pda time6pda time0pse time6pse if lptbetter6 == 3, statistics( mean sd min max count median ) columns(variables)
+tabstat time0pda time12pda time0pse time12pse if lptbetter12 == 3, statistics( mean sd min max count median ) columns(variables)
+tabstat time0pda time26pda time0pse time26pse if lptbetter26 == 3, statistics( mean sd min max count median ) columns(variables)
+tabstat time0pda time52pda time0pse time52pse if lptbetter52 == 3, statistics( mean sd min max count median ) columns(variables)
+by prptype, sort : tabstat time0pda time6pda if lptbetter6 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda time12pda if lptbetter12 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda time26pda if lptbetter26 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda time52pda if lptbetter52 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse time6pse if lptbetter6 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse time12pse if lptbetter12 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse time26pse if lptbetter26 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse time52pse if lptbetter52 == 3, statistics( mean sd median count min max ) by(prptype) columns(variables)
+
+tabstat time0pda if lptbetter6 == 3, statistics( mean ) columns(variables)
+tabstat time0pda if lptbetter12 == 3, statistics( mean ) columns(variables)
+tabstat time0pda if lptbetter26 == 3, statistics( mean ) columns(variables)
+tabstat time0pda if lptbetter52 == 3, statistics( mean ) columns(variables)
+tabstat time6pda if lptbetter6 == 3, statistics( mean ) columns(variables)
+tabstat time12pda if lptbetter12 == 3, statistics( mean ) columns(variables)
+tabstat time26pda if lptbetter26 == 3, statistics( mean ) columns(variables)
+tabstat time52pda if lptbetter52 == 3, statistics( mean ) columns(variables)
+
+tabstat time0pse if lptbetter6 == 3, statistics( mean ) columns(variables)
+tabstat time0pse if lptbetter12 == 3, statistics( mean ) columns(variables)
+tabstat time0pse if lptbetter26 == 3, statistics( mean ) columns(variables)
+tabstat time0pse if lptbetter52 == 3, statistics( mean ) columns(variables)
+tabstat time6pse if lptbetter6 == 3, statistics( mean ) columns(variables)
+tabstat time12pse if lptbetter12 == 3, statistics( mean ) columns(variables)
+tabstat time26pse if lptbetter26 == 3, statistics( mean ) columns(variables)
+tabstat time52pse if lptbetter52 == 3, statistics( mean ) columns(variables)
+
+by prptype, sort : tabstat time0pda if lptbetter6 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda if lptbetter12 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda if lptbetter26 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pda if lptbetter52 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time6pda if lptbetter6 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time12pda if lptbetter12 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time26pda if lptbetter26 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time52pda if lptbetter52 == 3, statistics( mean ) by(prptype) columns(variables)
+
+by prptype, sort : tabstat time0pse if lptbetter6 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse if lptbetter12 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse if lptbetter26 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time0pse if lptbetter52 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time6pse if lptbetter6 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time12pse if lptbetter12 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time26pse if lptbetter26 == 3, statistics( mean ) by(prptype) columns(variables)
+by prptype, sort : tabstat time52pse if lptbetter52 == 3, statistics( mean ) by(prptype) columns(variables)
+
+**Treatment Frequencies**
+table pt, contents(freq )
+table cortisone_yn, contents(freq )
+table nitropatch, contents(freq )
+table surgery, contents(freq )
+table coldlaser, contents(freq )
+table massage, contents(freq )
+table acupuncture, contents(freq )
+table chiropractor, contents(freq )
+table failedcontrt, contents(freq )
+
+
+**Comparison of means by PRPtype for VAS scores**
+ttest time0pda, by(prptype)
+ttest time6pda, by(prptype)
+ttest time12pda, by(prptype)
+ttest time26pda, by(prptype)
+ttest time52pda, by(prptype)
+ttest time0pse, by(prptype)
+ttest time6pse, by(prptype)
+ttest time12pse, by(prptype)
+ttest time26pse, by(prptype)
+ttest time52pse, by(prptype)
+
+table diagnosis prptype if lptbetter52 == 3, contents(freq )
