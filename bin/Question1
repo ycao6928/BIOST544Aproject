@@ -1,0 +1,161 @@
+all.df <- read.csv("/Users/yue/Desktop/prp_tendon_cleaned2_reshaped_delim.csv")
+head(all.df)
+
+
+__________________
+
+all.df.use <- all.df %>% select(patientid, time0,time6,time12,time26,time52,treatment,prptype)
+head(all.df.use)
+
+
+all.df.treatment <- all.df.use[1:19,]
+all.df.control<- all.df.use[20:160,]
+
+
+
+all.df.prp1 <- all.df.use[21:128,]
+head(all.df.prp1)
+
+all.df.prp2 <- all.df.use[129:160,]
+head(all.df.prp2)
+
+find.average.prp1 <- all.df.prp1 %>% select(time0,time6,time12,time26,time52) 
+colnames(find.average.prp1) <-NULL
+rownames(find.average.prp1) <-NULL
+
+
+find.average.prp2 <- all.df.prp2 %>% select(time0,time6,time12,time26,time52) 
+colnames(find.average.prp2) <-NULL
+rownames(find.average.prp2) <-NULL
+find.average.prp2
+
+y1 <- matrix(,nrow = 108, ncol =5)
+for (i in 1:5){
+  y <- find.average.prp1
+  y1[,i] <- y[,i] 
+  y1[,i]
+  
+  y2 <- y1[,i]
+  y2
+  y2[is.na(y2)] <- 0
+  y2
+  meany2 <- mean(y2)
+  
+  y1[,i][is.na(y1[,i])] <- meany2
+}
+y1
+ytreatment1 <- y1
+
+
+
+nrow(find.average.prp2)
+y1 <- matrix(,nrow = 32, ncol =5)
+for (i in 1:5){
+  y <- find.average.prp2
+  y1[,i] <- y[,i] 
+  y1[,i]
+  
+  y2 <- y1[,i]
+  y2
+  y2[is.na(y2)] <- 0
+  y2
+  meany2 <- mean(y2)
+  
+  y1[,i][is.na(y1[,i])] <- meany2
+}
+ytreatment2 <- y1
+
+
+ybind <- rbind(ytreatment1,ytreatment2)
+
+
+ytreatment1
+r = c(t(as.matrix(ytreatment1)))
+oneway <- data.frame(y = r, time = factor(rep(rep(1:5, ))),patient = factor(rep(1:108,each=5)))
+head(oneway)
+
+anova(lm(y~time*patient,data=oneway))
+
+anova(lm(y~time,data=oneway))
+anova(lm(y~patient,data=oneway))
+
+
+
+r = c(t(as.matrix(ytreatment2)))
+oneway2 <- data.frame(y = r, time = factor(rep(rep(1:5, ))),patient = factor(rep(1:32,each=5)))
+anova(lm(y~time*patient,data=oneway2))
+
+anova(lm(y~time,data=oneway2))
+anova(lm(y~patient,data=oneway2))
+
+_____________________
+head(ybind)
+
+yvalue = c(t(as.matrix(ybind)))
+oneway3 <- data.frame(y = yvalue, time = factor(rep(rep(1:5, ))),treatment = factor(rep(c(1,2),c(108*5,32*5))))
+
+
+anova(lm(yvalue~time*treatment,data = oneway3))
+
+_______________________
+
+
+##
+
+## calculates the difference between the two points 
+calc.diff <- function(data,factor,i,j){
+  
+  m1<- mean(data$y[factor==i])
+  m2 <- mean(data$y[factor==j])
+  aad <- mean(c(abs(data$y[factor==i] - m1),
+                abs(data$y[factor==j] - m2)))
+  
+  return((m1-m2)/aad)
+}
+
+calc.diff(oneway,oneway$time,2,1) #0.0264
+calc.diff(oneway2,oneway2$time,2,1) #0.024
+
+
+
+
+single.perm <- function(data, calc.diff,i,j){
+  
+  
+  perm.data <- oneway3
+  perm.data$randomtreat = perm.label
+  
+  original.label <- oneway3$treatment
+
+  skip <- original.label[seq(1,length(original.label),5)]
+
+  perm.label.skip <- sample(skip,replace = FALSE)
+  perm.label <- rep(perm.label.skip, each =5)
+
+  perm.data$randomtreat = perm.label
+
+newtreat1 <- subset(perm.data, randomtreat == 1)
+newtreat2 <- subset(perm.data, randomtreat == 2)
+
+  value1 <- calc.diff(newtreat1,newtreat1$time,j,i)
+  value2 <- calc.diff(newtreat2,newtreat2$time,j,i)
+  
+  perm.mean.diff <- value1 - value2
+  return(perm.mean.diff)
+}
+single.perm(oneway3,calc.diff,2,1)
+
+
+many.perm <- replicate(100,single.perm(oneway3,calc.diff,2,1))
+
+all.perm.stats <- data.frame(mean.diff = as.vector(many.perm))
+
+ggplot(all.perm.stats, aes(x=mean.diff, y=..density..)) +
+  geom_density()+
+  geom_vline(xintercept=0.02, colour = "red")
+
+
+calc.diff(oneway,oneway$time,2,1)
+
+
+
